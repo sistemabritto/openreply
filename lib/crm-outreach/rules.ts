@@ -8,7 +8,7 @@ export function classifyReply(text:string): 'interested'|'not_interested'|'manua
 }
 export function eligibleComment(at:Date,now=new Date()) { const age=now.getTime()-at.getTime();return Number.isFinite(age)&&age>=0&&age<7*86400000; }
 export function openReplyWindow(at:Date|null,now=new Date()) { return !!at&&Number.isFinite(at.getTime())&&now.getTime()>=at.getTime()&&now.getTime()-at.getTime()<86400000; }
-export function interestComment(text:string) { return /\b(crm|aula|quero|manda)\b/i.test(text); }
+export function interestComment(text:string) { return /\b(crm|aula|quero+|manda+|link|direct)\b/i.test(text); }
 function configInt(name:string,fallback:number,max:number) {const n=Number(process.env[name]??fallback);if(!Number.isInteger(n)||n<1||n>max)throw new Error(`Invalid ${name}`);return n;}
 export function outreachConfig() {
   const raw=process.env.CRM_SURVEY_URL;if(!raw)throw new Error('CRM_SURVEY_URL is required');const url=new URL(raw);if(url.protocol!=='https:')throw new Error('CRM_SURVEY_URL must use HTTPS');

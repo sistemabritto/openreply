@@ -1,5 +1,5 @@
 import { beforeEach,describe,it,expect,vi } from 'vitest';
-import { classifyReply,eligibleComment,openReplyWindow,FIRST_MESSAGE,surveyMessage } from '@/lib/crm-outreach/rules';
+import { classifyReply,eligibleComment,openReplyWindow,FIRST_MESSAGE,surveyMessage,interestComment } from '@/lib/crm-outreach/rules';
 const mocks=vi.hoisted(()=>({lead:{findFirst:vi.fn(),findUnique:vi.fn(),findMany:vi.fn(),updateMany:vi.fn(),update:vi.fn()},campaign:{update:vi.fn()},account:{findUnique:vi.fn()},dm:{findFirst:vi.fn()},event:{create:vi.fn()},privateSend:vi.fn(),directSend:vi.fn(),slot:vi.fn(),usage:vi.fn(),release:vi.fn(),add:vi.fn()}));
 vi.mock('@/lib/db/client',()=>({prisma:{crmOutreachLead:mocks.lead,crmOutreachCampaign:mocks.campaign,crmOutreachEvent:mocks.event,instagramAccount:mocks.account,dmLog:mocks.dm,$transaction:async (callback:(tx:{crmOutreachLead:typeof mocks.lead})=>Promise<unknown>)=>callback({crmOutreachLead:mocks.lead})}}));
 vi.mock('@/lib/meta/oauth',()=>({decryptToken:()=> 'test-token'}));
@@ -16,6 +16,7 @@ describe('conservative CRM intent',()=>{
  it.each(['não','nao','não quero','pare','sai','não tenho interesse'])('stops for %s',text=>expect(classifyReply(text)).toBe('not_interested'));
  it.each(['sim mas não quero agora','pode ser','manda depois','quanto custa?','👍','não sei','não, pode mandar','pode?','sim?'])('reviews ambiguous %s',text=>expect(classifyReply(text)).toBe('manual_review'));
  it('enforces exact seven-day and 24-hour bounds including future/invalid dates',()=>{expect(eligibleComment(new Date(now.getTime()-7*86400000),now)).toBe(false);expect(eligibleComment(new Date(now.getTime()-7*86400000+1),now)).toBe(true);expect(eligibleComment(new Date(now.getTime()+1),now)).toBe(false);expect(eligibleComment(new Date('invalid'),now)).toBe(false);expect(openReplyWindow(new Date(now.getTime()-86400000),now)).toBe(false);expect(openReplyWindow(null,now)).toBe(false);});
+ it('recognizes actual interested comment variations on explicitly selected posts',()=>{expect(interestComment('Mandaaa')).toBe(true);expect(interestComment('querooo')).toBe(true);expect(interestComment('link')).toBe(true);expect(interestComment('mandarim')).toBe(false);});
  it('first DM contains no link and second uses configured survey with campaign attribution',()=>{expect(FIRST_MESSAGE).not.toMatch(/https?:|www\./);expect(surveyMessage()).toContain('https://www.sistemabritto.com.br/pesquisa-crm?utm_source=instagram');expect(surveyMessage()).toContain('pesquisa_semente_crm');});
 });
 describe('official API send guards',()=>{
