@@ -1,13 +1,26 @@
 import assert from 'node:assert/strict';
 import {prisma} from '../lib/db/client';
-import {tickOutreach,handleReply,sendOutreach,ownsComment} from '../lib/crm-outreach/service';
+import {encryptToken} from '../lib/meta/oauth';
+import {tickOutreach,handleReply,sendOutreach,ownsComment,importComments} from '../lib/crm-outreach/service';
 async function main(){
  if(!['127.0.0.1','localhost'].includes(new URL(process.env.DATABASE_URL!).hostname))throw Error('Local test DB only');
  process.env.CRM_OUTREACH_ENABLED='true';process.env.CRM_SURVEY_URL='https://example.com/pesquisa-crm';
  const user=await prisma.user.create({data:{email:'crm-local-fixture@example.test'}});
  const workspace=await prisma.workspace.create({data:{name:'Local CRM test',ownerId:user.id}});
- const account=await prisma.instagramAccount.create({data:{workspaceId:workspace.id,instagramId:'crm-test-ig',username:'crm-test',accessToken:'no-real-token'}});
+ process.env.ENCRYPTION_KEY='ab'.repeat(32);
+ const account=await prisma.instagramAccount.create({data:{workspaceId:workspace.id,instagramId:'crm-test-ig',username:'crm-test',accessToken:encryptToken('no-real-token')}});
  const campaign=await prisma.crmOutreachCampaign.create({data:{workspaceId:workspace.id,instagramAccountId:account.id,status:'paused',mediaIds:['media']}});
+ const automation=await prisma.automation.create({data:{workspaceId:workspace.id,instagramAccountId:account.id,name:'Local legacy test',keywords:['crm'],dmMessage:'fixture'}});
+ await prisma.dmLog.create({data:{workspaceId:workspace.id,instagramAccountId:account.id,automationId:automation.id,commenterId:'historic-person',commentId:'historic-comment-a',commentText:'CRM',status:'SENT'}});
+ globalThis.fetch=async input=>{
+   const path=new URL(String(input)).pathname;
+   if(path.endsWith('/me/media'))return new Response(JSON.stringify({data:[{id:'media'}]}));
+   if(path.endsWith('/media/comments'))return new Response(JSON.stringify({data:['a','b'].map(id=>({id:'historic-comment-'+id,text:'quero CRM',from:{id:'historic-person'},timestamp:new Date(Date.now()-86400000).toISOString()}))}));
+   throw new Error('Unexpected mocked Meta request');
+ };
+ await importComments(workspace.id,account.id,['media']);await importComments(workspace.id,account.id,['media']);
+ const historic=await prisma.crmOutreachLead.findUniqueOrThrow({where:{campaignId_commenterId:{campaignId:campaign.id,commenterId:'historic-person'}}});
+ assert.equal(historic.status,'do_not_contact');assert.equal(historic.duplicateCount,1);assert.equal(await prisma.crmOutreachComment.count({where:{leadId:historic.id}}),2);assert.equal((await prisma.crmOutreachCampaign.findUniqueOrThrow({where:{id:campaign.id}})).status,'paused');
  const lead=await prisma.crmOutreachLead.create({data:{campaignId:campaign.id,commenterId:'person',status:'first_message_queued',firstQueuedAt:new Date()}});
  assert.equal(await ownsComment(account.instagramId,'person',['other-media']),false);assert.equal(await ownsComment(account.instagramId,'person',['media']),true);
  await assert.rejects(()=>prisma.crmOutreachLead.create({data:{campaignId:campaign.id,commenterId:'person'}}));
