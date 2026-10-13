@@ -1,3 +1,4 @@
+import { CRM_JOB, handleReply, ownsComment, sendOutreach } from "@/lib/crm-outreach/service";
 import { Worker, type Job } from "bullmq";
 import {
   getDMQueue,
@@ -198,6 +199,7 @@ async function processComment(job: Job<ProcessCommentJob>): Promise<void> {
     mediaId,
     originalMediaId,
   } = job.data;
+  if (await ownsComment(instagramAccountId, commenterId)) return;
   const requeueAttempt = job.data.requeueAttempt ?? 0;
 
   const automations = await prisma.automation.findMany({
@@ -944,6 +946,7 @@ async function processFollowUp(job: Job<ProcessFollowUpJob>): Promise<void> {
  * Dedup is per inbound message id, so each message triggers at most one reply.
  */
 async function processMessage(job: Job<ProcessMessageJob>): Promise<void> {
+  if (await handleReply(job.data)) return;
   const { instagramAccountId, messageId, messageText, senderId } = job.data;
 
   const automations = await prisma.automation.findMany({
@@ -1187,6 +1190,7 @@ async function processMessage(job: Job<ProcessMessageJob>): Promise<void> {
 }
 
 async function processJob(job: Job<DmQueueJob>): Promise<void> {
+  if (job.name === CRM_JOB && "leadId" in job.data) return sendOutreach(job.data.leadId, job.data.phase);
   if (job.name === POSTBACK_JOB_NAME) {
     return processPostback(job as Job<ProcessPostbackJob>);
   }
@@ -1204,7 +1208,7 @@ async function recordWorkerFailure(
   error: Error
 ) {
   try {
-    const instagramAccountId = job?.data.instagramAccountId;
+    const instagramAccountId = job && "instagramAccountId" in job.data ? job.data.instagramAccountId : undefined;
     const commentId =
       job && "commentId" in job.data ? job.data.commentId : null;
     const account = instagramAccountId

@@ -6,3 +6,7 @@ node_modules
 __tests__
 docs
 *.md
+
+.local-audit
+.backups
+.env.*

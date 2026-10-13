@@ -64,13 +64,15 @@ export interface ProcessMessageJob {
   messageId: string;
   messageText: string;
   senderId: string;
+  inboundTimestamp?: string;
 }
 
 export type DmQueueJob =
   | ProcessCommentJob
   | ProcessPostbackJob
   | ProcessFollowUpJob
-  | ProcessMessageJob;
+  | ProcessMessageJob
+  | { leadId: string; phase: "first" | "survey" };
 
 export const POSTBACK_JOB_NAME = "process-postback";
 export const FOLLOWUP_JOB_NAME = "process-followup";

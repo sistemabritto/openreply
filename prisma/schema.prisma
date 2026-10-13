@@ -83,6 +83,7 @@ model Workspace {
   trackedLinks      TrackedLink[]
   linkClicks        LinkClick[]
   webhookEvents     WebhookEvent[]
+  crmOutreachCampaigns CrmOutreachCampaign[]
   operationalEvents OperationalEvent[]
 
   @@index([ownerId])
@@ -140,6 +141,7 @@ model InstagramAccount {
   automations Automation[]
   dmLogs      DmLog[]
   linkClicks  LinkClick[]
+  crmOutreachCampaigns CrmOutreachCampaign[]
   followerSnapshots FollowerSnapshot[]
 
   @@index([workspaceId])
@@ -385,4 +387,75 @@ enum OperationalEventLevel {
   INFO
   WARNING
   ERROR
+}
+
+/// Opt-in outreach is isolated from legacy comment-to-DM automations.
+model CrmOutreachCampaign {
+  id String @id @default(cuid())
+  workspaceId String
+  instagramAccountId String
+  name String @default("pesquisa_semente_crm")
+  mediaIds String[] @default([])
+  status String @default("paused")
+  pilotReviewedAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  workspace Workspace @relation(fields:[workspaceId],references:[id],onDelete:Cascade)
+  instagramAccount InstagramAccount @relation(fields:[instagramAccountId],references:[id],onDelete:Cascade)
+  leads CrmOutreachLead[]
+  @@unique([workspaceId, instagramAccountId, name])
+  @@index([workspaceId])
+}
+model CrmOutreachLead {
+  id String @id @default(cuid())
+  campaignId String
+  commenterId String
+  username String?
+  messagingUserId String?
+  status String @default("pending")
+  reason String?
+  duplicateCount Int @default(0)
+  firstQueuedAt DateTime?
+  firstSentAt DateTime?
+  firstMessageId String?
+  lastReplyAt DateTime?
+  replyMessageId String?
+  replyText String?
+  surveySentAt DateTime?
+  surveyMessageId String?
+  surveyCompletedAt DateTime?
+  sendingPhase String?
+  sendStartedAt DateTime?
+  nextAttemptAt DateTime @default(now())
+  retrySafe Boolean @default(false)
+  isPilot Boolean @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  campaign CrmOutreachCampaign @relation(fields:[campaignId],references:[id],onDelete:Cascade)
+  comments CrmOutreachComment[]
+  events CrmOutreachEvent[]
+  @@unique([campaignId,commenterId])
+  @@unique([campaignId,messagingUserId])
+  @@index([status,nextAttemptAt])
+}
+model CrmOutreachComment {
+  id String @id @default(cuid())
+  leadId String
+  campaignId String
+  commentId String
+  mediaId String
+  commentedAt DateTime
+  text String
+  lead CrmOutreachLead @relation(fields:[leadId],references:[id],onDelete:Cascade)
+  @@unique([campaignId,commentId])
+  @@index([leadId,commentedAt])
+}
+model CrmOutreachEvent {
+  id String @id @default(cuid())
+  leadId String
+  type String
+  detail Json?
+  createdAt DateTime @default(now())
+  lead CrmOutreachLead @relation(fields:[leadId],references:[id],onDelete:Cascade)
+  @@index([leadId,createdAt])
 }

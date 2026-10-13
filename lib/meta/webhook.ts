@@ -72,6 +72,7 @@ interface WebhookEntry {
     };
   }>;
   messaging?: Array<{
+    timestamp?: number;
     sender?: { id?: string };
     recipient?: { id?: string };
     postback?: { mid?: string; title?: string; payload?: string };
@@ -92,6 +93,7 @@ export interface WebhookMessageEvent {
   messageId: string;
   messageText: string;
   senderId: string;
+  inboundTimestamp?: string;
 }
 
 export interface WebhookPostbackEvent {
@@ -233,6 +235,7 @@ export function parseMessageEvents(
         messageId,
         messageText: text,
         senderId,
+        ...(messaging.timestamp && Number.isFinite(messaging.timestamp) ? { inboundTimestamp: new Date(messaging.timestamp).toISOString() } : {}),
       });
     }
   }

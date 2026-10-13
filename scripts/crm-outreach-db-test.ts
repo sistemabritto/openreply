@@ -1,0 +1,27 @@
+import assert from 'node:assert/strict';
+import {prisma} from '../lib/db/client';
+import {tickOutreach,handleReply,sendOutreach} from '../lib/crm-outreach/service';
+async function main(){
+ if(!['127.0.0.1','localhost'].includes(new URL(process.env.DATABASE_URL!).hostname))throw Error('Local test DB only');
+ process.env.CRM_OUTREACH_ENABLED='true';process.env.CRM_SURVEY_URL='https://example.com/pesquisa-crm';
+ const user=await prisma.user.create({data:{email:'crm-local-fixture@example.test'}});
+ const workspace=await prisma.workspace.create({data:{name:'Local CRM test',ownerId:user.id}});
+ const account=await prisma.instagramAccount.create({data:{workspaceId:workspace.id,instagramId:'crm-test-ig',username:'crm-test',accessToken:'no-real-token'}});
+ const campaign=await prisma.crmOutreachCampaign.create({data:{workspaceId:workspace.id,instagramAccountId:account.id,status:'paused',mediaIds:['media']}});
+ const lead=await prisma.crmOutreachLead.create({data:{campaignId:campaign.id,commenterId:'person',status:'first_message_queued',firstQueuedAt:new Date()}});
+ await assert.rejects(()=>prisma.crmOutreachLead.create({data:{campaignId:campaign.id,commenterId:'person'}}));
+ const claims=await Promise.all(Array.from({length:10},()=>prisma.crmOutreachLead.updateMany({where:{id:lead.id,status:'first_message_queued',sendingPhase:null},data:{sendingPhase:'first',sendStartedAt:new Date(Date.now()-16*60000)}})));
+ assert.equal(claims.reduce((sum,c)=>sum+c.count,0),1);
+ await tickOutreach();assert.equal((await prisma.crmOutreachLead.findUniqueOrThrow({where:{id:lead.id}})).status,'manual_review');
+ let networkCalls=0;globalThis.fetch=async()=>{networkCalls++;throw Error('No live calls from DB test');};
+ await sendOutreach(lead.id,'first');assert.equal(networkCalls,0);
+ await prisma.crmOutreachLead.update({where:{id:lead.id},data:{status:'waiting_reply',firstSentAt:new Date(Date.now()-60000),firstMessageId:'test-mid',sendingPhase:null,sendStartedAt:null}});
+ const reply={instagramAccountId:account.instagramId,senderId:'person',messageId:'reply-1',messageText:'sim',inboundTimestamp:new Date().toISOString()};
+ await handleReply(reply);assert.equal((await prisma.crmOutreachLead.findUniqueOrThrow({where:{id:lead.id}})).status,'interested');
+ const count=await prisma.crmOutreachEvent.count({where:{leadId:lead.id}});await handleReply(reply);assert.equal(await prisma.crmOutreachEvent.count({where:{leadId:lead.id}}),count);
+ await sendOutreach(lead.id,'survey');assert.equal(networkCalls,0);
+ await handleReply({...reply,messageId:'reply-2',messageText:'não'});assert.equal((await prisma.crmOutreachLead.findUniqueOrThrow({where:{id:lead.id}})).status,'not_interested');
+ await prisma.workspace.delete({where:{id:workspace.id}});assert.equal(await prisma.crmOutreachLead.count({where:{id:lead.id}}),0);await prisma.user.delete({where:{id:user.id}});
+ console.log('PASS real Postgres migrations, identity uniqueness, concurrent claim, interrupted POST, pause, reply replay, opt-out, FK cleanup');
+ await prisma.$disconnect();
+}main().catch(e=>{console.error(e);process.exitCode=1;}).finally(()=>prisma.$disconnect());

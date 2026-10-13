@@ -1,3 +1,4 @@
+import { tickOutreach } from "@/lib/crm-outreach/service";
 import { createDMWorker } from "@/lib/queue/dm-worker";
 import { recordWorkerHeartbeat } from "@/lib/ops/worker-health";
 import { reconcileComments } from "@/lib/polling/comment-reconciler";
@@ -5,6 +6,7 @@ import { attachPendingNextReels } from "@/lib/automation/attach-next-reel";
 import os from "node:os";
 
 const worker = createDMWorker();
+const outreachTimer = setInterval(() => { void tickOutreach().catch(error => console.error("[CRM outreach]", error instanceof Error ? error.message : "tick_failed")); }, 60_000);
 const startedAt = new Date().toISOString();
 const HEARTBEAT_INTERVAL_MS = 30_000;
 // Polling safety net for comments that webhooks miss. Runs in the worker because
@@ -50,6 +52,7 @@ const pollTimer = setInterval(() => void poll(), POLL_INTERVAL_MS);
 
 async function shutdown(signal: string) {
   console.log(`[DM Worker] ${signal} received, closing worker`);
+  clearInterval(outreachTimer);
   clearInterval(heartbeatTimer);
   clearInterval(pollTimer);
   await worker.close();
