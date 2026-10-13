@@ -57,6 +57,8 @@ Ferramenta de importação no container autorizado, sempre sem início automáti
 ```sh
 npx tsx scripts/crm-outreach-admin.ts import sistemabritto 'https://www.instagram.com/reel/DcpcV-kNq9k/' 'https://www.instagram.com/reel/DcRZptzSk5a/'
 npx tsx scripts/crm-outreach-admin.ts report sistemabritto
+# Apenas após revisar os candidatos: autoriza somente os IDs explícitos, no máximo 5.
+npx tsx scripts/crm-outreach-admin.ts pilot sistemabritto LEAD_ID --confirm-real-messages
 ```
 
 ## Verificação
