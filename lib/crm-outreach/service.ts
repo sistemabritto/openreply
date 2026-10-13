@@ -89,6 +89,7 @@ export async function tickOutreach() {
 export async function sendOutreach(leadId:string,phase:'first'|'survey') {
   if(!enabled())return;
   const lead=await prisma.crmOutreachLead.findUnique({where:{id:leadId},include:{campaign:true,comments:{orderBy:{commentedAt:'desc'}}}});if(!lead)return;
+  if(lead.surveySentAt||lead.surveyMessageId||lead.surveyCompletedAt)return;
   const expected=phase==='first'?'first_message_queued':'interested';
   if(lead.status!==expected||lead.sendingPhase||lead.nextAttemptAt>new Date()||!['running','pilot'].includes(lead.campaign.status)||(lead.campaign.status==='pilot'&&!lead.isPilot))return;
   const account=await prisma.instagramAccount.findUnique({where:{id:lead.campaign.instagramAccountId}});if(!account)return;
@@ -128,6 +129,7 @@ export async function sendOutreach(leadId:string,phase:'first'|'survey') {
     await prisma.$transaction(async tx=>{
       await tx.crmOutreachLead.updateMany({where:{id:lead.id,status:expected,sendingPhase:phase},data:{status:phase==='first'?'waiting_reply':'survey_sent'}});
       await tx.crmOutreachLead.update({where:{id:lead.id},data:phase==='first'?{firstSentAt:new Date(),firstMessageId:result.message_id,messagingUserId:result.recipient_id,sendingPhase:null}:{surveySentAt:new Date(),surveyMessageId:result.message_id,sendingPhase:null}});
+      await tx.crmOutreachLead.updateMany({where:{id:lead.id,status:'waiting_reply',reason:'age_candidate_not_api_confirmed'},data:{reason:null}});
     });
     await event(lead.id,phase==='first'?'first_message_sent':'survey_sent',{messageId:result.message_id,recipientId:result.recipient_id,http:200,commentId:phase==='first'?comment!.commentId:null,ageDays:phase==='first'?(Date.now()-comment!.commentedAt.getTime())/86400000:null});
   } catch(error) {

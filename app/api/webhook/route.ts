@@ -4,6 +4,7 @@ import { getDMQueue } from "@/lib/queue/client";
 import {
   parseCommentEvents,
   parseMessageEvents,
+  parseCrmAttachmentEvents,
   parsePostbackEvents,
   parseReadEvents,
   verifyWebhookSignature,
@@ -140,9 +141,10 @@ export async function POST(request: NextRequest) {
     }
 
     // Inbound DMs → keyword-triggered autoreply.
-    const messageEvents = parseMessageEvents(
-      payload as Parameters<typeof parseMessageEvents>[0]
-    );
+    const messageEvents = [
+      ...parseMessageEvents(payload as Parameters<typeof parseMessageEvents>[0]),
+      ...(process.env.CRM_OUTREACH_ENABLED === "true" ? parseCrmAttachmentEvents(payload as Parameters<typeof parseCrmAttachmentEvents>[0]) : []),
+    ];
 
     for (const event of messageEvents) {
       const account = await prisma.instagramAccount.findUnique({
@@ -158,6 +160,7 @@ export async function POST(request: NextRequest) {
           messageText: event.messageText,
           senderId: event.senderId,
           inboundTimestamp: event.inboundTimestamp,
+          outreachOnly: event.outreachOnly,
         },
         {
           // Message ids can contain characters BullMQ rejects in a job id (":"

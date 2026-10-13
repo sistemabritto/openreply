@@ -947,6 +947,7 @@ async function processFollowUp(job: Job<ProcessFollowUpJob>): Promise<void> {
  */
 async function processMessage(job: Job<ProcessMessageJob>): Promise<void> {
   if (await handleReply(job.data)) return;
+  if (job.data.outreachOnly) return;
   const { instagramAccountId, messageId, messageText, senderId } = job.data;
 
   const automations = await prisma.automation.findMany({

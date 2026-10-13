@@ -65,6 +65,7 @@ export interface ProcessMessageJob {
   messageText: string;
   senderId: string;
   inboundTimestamp?: string;
+  outreachOnly?: boolean;
 }
 
 export type DmQueueJob =

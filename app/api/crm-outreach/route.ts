@@ -59,6 +59,7 @@ export async function POST(req:NextRequest) {
       await prisma.$transaction(async tx=>{await tx.crmOutreachCampaign.update({where:{id:campaign.id},data:{status:'running',pilotReviewedAt:new Date()}});await tx.crmOutreachLead.updateMany({where:{campaignId:campaign.id,status:'eligible',firstSentAt:null},data:{status:'first_message_queued',firstQueuedAt:new Date(),nextAttemptAt:new Date()}});});
     } else {
       const lead=await prisma.crmOutreachLead.findFirst({where:{id:body.leadId||'',campaignId:campaign.id},include:{comments:true}});if(!lead)throw new Error('Lead não encontrado');
+      if(['approve','retry'].includes(body.action) && (lead.surveySentAt||lead.surveyMessageId||lead.surveyCompletedAt))throw new Error('Pesquisa já enviada ou concluída; não será reenviada');
       if(body.action==='do_not_contact'||body.action==='remove')await prisma.crmOutreachLead.update({where:{id:lead.id},data:{status:'do_not_contact',reason:body.action==='remove'?'removed_by_owner':'owner_opt_out',retrySafe:false}});
       else if(body.action==='approve') {
         if(body.confirmed!==true||lead.status!=='manual_review'||!lead.replyMessageId||!openReplyWindow(lead.lastReplyAt)||lead.sendingPhase)throw new Error('Exige resposta real dentro de 24h e sem envio incerto');

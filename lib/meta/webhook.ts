@@ -94,6 +94,7 @@ export interface WebhookMessageEvent {
   messageText: string;
   senderId: string;
   inboundTimestamp?: string;
+  outreachOnly?: boolean;
 }
 
 export interface WebhookPostbackEvent {
@@ -271,5 +272,21 @@ export function parseReadEvents(payload: WebhookPayload): WebhookReadEvent[] {
     }
   }
 
+  return events;
+}
+
+/** CRM-only fallback. Legacy keyword automations still ignore non-text replies. */
+export function parseCrmAttachmentEvents(payload: WebhookPayload): WebhookMessageEvent[] {
+  if(payload.object!=='instagram')return [];
+  const events:WebhookMessageEvent[]=[];
+  for(const entry of payload.entry??[])for(const messaging of entry.messaging??[]) {
+    const message=messaging.message;
+    if(!message||message.is_echo||message.is_deleted||(!message.is_unsupported&&!message.attachments?.length))continue;
+    if(message.text?.trim()&&!message.is_unsupported)continue;
+    const senderId=messaging.sender?.id,accountId=entry.id??messaging.recipient?.id;
+    if(!message.mid||!senderId||!accountId||senderId===accountId)continue;
+    const time=messaging.timestamp?new Date(messaging.timestamp):null;
+    events.push({instagramAccountId:accountId,senderId,messageId:message.mid,messageText:'[Anexo ou resposta não suportada: conferir no inbox]',outreachOnly:true,...(time&&Number.isFinite(time.getTime())?{inboundTimestamp:time.toISOString()}:{})});
+  }
   return events;
 }
