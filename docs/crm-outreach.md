@@ -16,7 +16,7 @@ Não há follow-up. Respostas negativas bloqueiam novos envios. Campanha pausada
 
 Painel: total único, duplicados, candidatos/inelegíveis, primeira DM enviada, respostas, interessados, pesquisa enviada, não interessados, revisão e falhas; filtros e CSV completo protegido. `response_rate = pessoas com resposta verificada / primeiras DMs enviadas`; `survey_send_rate = pesquisas enviadas / primeiras DMs enviadas`. `survey_completed` é confirmação manual após verificar no admin da pesquisa, não inferência por clique. Não há correlação automática confiável entre identidade Instagram e telefone coletado no site nesta versão.
 
-Campanhas antigas seguem existentes. A supressão da automação legada é limitada às pessoas efetivamente selecionadas/enfileiradas pela nova campanha ou com opt-out manual; somente importar candidatos não toma controle da automação antiga. O worker confere novamente envios legados antes da primeira abordagem.
+Campanhas antigas seguem existentes. A supressão da automação legada é limitada às pessoas efetivamente selecionadas/enfileiradas nos posts desta campanha ou com opt-out manual nesses posts; somente importar candidatos não toma controle da automação antiga. O worker confere novamente envios legados antes da primeira abordagem.
 
 ## Configuração
 

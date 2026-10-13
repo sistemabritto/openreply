@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import {prisma} from '../lib/db/client';
-import {tickOutreach,handleReply,sendOutreach} from '../lib/crm-outreach/service';
+import {tickOutreach,handleReply,sendOutreach,ownsComment} from '../lib/crm-outreach/service';
 async function main(){
  if(!['127.0.0.1','localhost'].includes(new URL(process.env.DATABASE_URL!).hostname))throw Error('Local test DB only');
  process.env.CRM_OUTREACH_ENABLED='true';process.env.CRM_SURVEY_URL='https://example.com/pesquisa-crm';
@@ -9,6 +9,7 @@ async function main(){
  const account=await prisma.instagramAccount.create({data:{workspaceId:workspace.id,instagramId:'crm-test-ig',username:'crm-test',accessToken:'no-real-token'}});
  const campaign=await prisma.crmOutreachCampaign.create({data:{workspaceId:workspace.id,instagramAccountId:account.id,status:'paused',mediaIds:['media']}});
  const lead=await prisma.crmOutreachLead.create({data:{campaignId:campaign.id,commenterId:'person',status:'first_message_queued',firstQueuedAt:new Date()}});
+ assert.equal(await ownsComment(account.instagramId,'person',['other-media']),false);assert.equal(await ownsComment(account.instagramId,'person',['media']),true);
  await assert.rejects(()=>prisma.crmOutreachLead.create({data:{campaignId:campaign.id,commenterId:'person'}}));
  const claims=await Promise.all(Array.from({length:10},()=>prisma.crmOutreachLead.updateMany({where:{id:lead.id,status:'first_message_queued',sendingPhase:null},data:{sendingPhase:'first',sendStartedAt:new Date(Date.now()-16*60000)}})));
  assert.equal(claims.reduce((sum,c)=>sum+c.count,0),1);

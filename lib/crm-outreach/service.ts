@@ -62,10 +62,10 @@ export async function handleReply(job:ProcessMessageJob):Promise<boolean> {
   if(changed.count)await event(lead.id,'reply_classified',{classification:intent,messageId:job.messageId});
   return true;
 }
-export async function ownsComment(accountIgId:string,commenterId:string) {
+export async function ownsComment(accountIgId:string,commenterId:string,mediaIds:string[]) {
   if(!enabled())return false;
   const account=await prisma.instagramAccount.findUnique({where:{instagramId:accountIgId},select:{id:true}});if(!account)return false;
-  return !!await prisma.crmOutreachLead.findFirst({where:{commenterId,campaign:{instagramAccountId:account.id},OR:[{firstQueuedAt:{not:null}},{reason:{in:['owner_opt_out','removed_by_owner','explicit_opt_out']}}]},select:{id:true}});
+  return !!await prisma.crmOutreachLead.findFirst({where:{commenterId,campaign:{instagramAccountId:account.id,mediaIds:{hasSome:mediaIds}},OR:[{firstQueuedAt:{not:null}},{reason:{in:['owner_opt_out','removed_by_owner','explicit_opt_out']}}]},select:{id:true}});
 }
 const RATE_SCRIPT=`local b=tonumber(redis.call('GET',KEYS[1]) or '0'); local d=tonumber(redis.call('GET',KEYS[2]) or '0'); if b>=tonumber(ARGV[1]) or d>=tonumber(ARGV[2]) then return 0 end; if redis.call('INCR',KEYS[1])==1 then redis.call('PEXPIRE',KEYS[1],ARGV[3]) end; if redis.call('INCR',KEYS[2])==1 then redis.call('EXPIRE',KEYS[2],172800) end; return 1`;
 async function reserveCampaign(campaignId:string) { const c=outreachConfig();return Number(await getRedisConnection().eval(RATE_SCRIPT,2,`crm-batch-${campaignId}`,`crm-day-${campaignId}-${new Date().toISOString().slice(0,10)}`,c.batch,c.daily,c.interval))===1; }

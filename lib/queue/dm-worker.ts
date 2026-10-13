@@ -199,7 +199,7 @@ async function processComment(job: Job<ProcessCommentJob>): Promise<void> {
     mediaId,
     originalMediaId,
   } = job.data;
-  if (await ownsComment(instagramAccountId, commenterId)) return;
+  if (await ownsComment(instagramAccountId, commenterId, [mediaId, ...(originalMediaId ? [originalMediaId] : [])])) return;
   const requeueAttempt = job.data.requeueAttempt ?? 0;
 
   const automations = await prisma.automation.findMany({
