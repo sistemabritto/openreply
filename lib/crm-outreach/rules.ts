@@ -1,4 +1,4 @@
-export const FIRST_MESSAGE = 'Fala! Vi que você comentou pedindo a aula sobre o CRM que eu mostrei.\n\nComo bastante gente pediu, resolvi fazer um material bem mais completo.\n\nAntes de terminar, queria ouvir quem demonstrou interesse pra entender o que realmente precisa entrar.\n\nPosso te mandar uma pesquisa rapidinha? Quem participar vai receber o material gratuitamente quando eu liberar.';
+export const FIRST_MESSAGE = 'Fala! Vi que você pediu a aula de CRM 👊\n\nPosso te mandar uma pesquisa rapidinha? Quem responder recebe o material completo de CRM + WhatsApp + IA gratuitamente quando eu liberar.';
 export const TERMINAL = ['survey_sent','survey_completed','not_interested','do_not_contact'];
 const positive = new Set(['sim','pode','manda','quero','claro','beleza','bora','envia','manda ai','pode mandar']);
 const negative = new Set(['nao','nao quero','pare','sai','nao tenho interesse']);
@@ -15,4 +15,4 @@ export function outreachConfig() {
   if(process.env.CRM_FOLLOWUP_ENABLED==='true')throw new Error('Follow-up is not implemented and cannot be enabled');
   return {url:url.toString(),batch:configInt('CRM_OUTREACH_BATCH_SIZE',5,50),interval:configInt('CRM_OUTREACH_BATCH_INTERVAL_MINUTES',30,1440)*60000,daily:configInt('CRM_OUTREACH_DAILY_LIMIT',50,500)};
 }
-export function surveyMessage() { const url=new URL(outreachConfig().url);url.searchParams.set('utm_source','instagram');url.searchParams.set('utm_medium','dm');url.searchParams.set('utm_campaign','pesquisa_semente_crm');return `Boa! É bem rápida 👇\n\n${url}\n\nA principal coisa que estou tentando entender é se você quer usar o CRM no seu próprio negócio ou aprender a oferecer isso para clientes.\n\nQuando eu finalizar o material, quem respondeu vai receber o acesso gratuitamente.`; }
+export function surveyMessage() { const url=new URL(outreachConfig().url);url.searchParams.set('utm_source','instagram');url.searchParams.set('utm_medium','dm');url.searchParams.set('utm_campaign','pesquisa_semente_crm');return `Boa! É bem rápida 👇\n\n${url}\n\nQuem responder recebe o material completo gratuitamente quando eu liberar.`; }
