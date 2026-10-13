@@ -20,7 +20,7 @@ export async function importComments(workspaceId:string,accountId:string,mediaId
     const comments=await getRecentMediaComments(token,mediaId,0,5000);
     if(comments.length>=5000)throw new Error('Post com mais de 5000 comentários: importação parcial bloqueada');
     for(const comment of comments) {
-      if(!interestComment(comment.text)||comment.from?.id===account.instagramId)continue;
+      if(!interestComment(comment.text)||(comment.from?.id===account.instagramId||comment.from?.username===account.username))continue;
       if(!comment.from?.id||!Number.isFinite(new Date(comment.timestamp).getTime())) {missingIdentity++;continue;}
       await prisma.$transaction(async tx=>{
         const lead=await tx.crmOutreachLead.upsert({where:{campaignId_commenterId:{campaignId:campaign.id,commenterId:comment.from!.id}},create:{campaignId:campaign.id,commenterId:comment.from!.id,username:comment.from!.username},update:{}});
@@ -122,8 +122,12 @@ export async function sendOutreach(leadId:string,phase:'first'|'survey') {
     posted=true;
     const result=phase==='first'?await sendPrivateReply(token,account.instagramId,comment!.commentId,FIRST_MESSAGE):await sendDirectMessage(token,account.instagramId,lead.messagingUserId!,surveyMessage());
     if(!result.message_id)throw new Error('send_outcome_unknown');
-    // Preserve a concurrent opt-out: never overwrite it with waiting_reply.
-    await prisma.crmOutreachLead.updateMany({where:{id:lead.id,status:expected,sendingPhase:phase},data:phase==='first'?{status:'waiting_reply',firstSentAt:new Date(),firstMessageId:result.message_id,messagingUserId:result.recipient_id,sendingPhase:null}:{status:'survey_sent',surveySentAt:new Date(),surveyMessageId:result.message_id,sendingPhase:null,reason:null}});
+    // Persist the real receipt even when an opt-out arrived during the POST.
+    // Only the conditional status transition may create waiting_reply/survey_sent.
+    await prisma.$transaction(async tx=>{
+      await tx.crmOutreachLead.updateMany({where:{id:lead.id,status:expected,sendingPhase:phase},data:{status:phase==='first'?'waiting_reply':'survey_sent'}});
+      await tx.crmOutreachLead.update({where:{id:lead.id},data:phase==='first'?{firstSentAt:new Date(),firstMessageId:result.message_id,messagingUserId:result.recipient_id,sendingPhase:null}:{surveySentAt:new Date(),surveyMessageId:result.message_id,sendingPhase:null}});
+    });
     await event(lead.id,phase==='first'?'first_message_sent':'survey_sent',{messageId:result.message_id,recipientId:result.recipient_id,http:200,commentId:phase==='first'?comment!.commentId:null,ageDays:phase==='first'?(Date.now()-comment!.commentedAt.getTime())/86400000:null});
   } catch(error) {
     const known=error instanceof MetaApiError;
