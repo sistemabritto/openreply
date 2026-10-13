@@ -30,7 +30,7 @@ export async function GET(req:NextRequest) {
   const [grouped,leads,total,firstSent,responded,surveySent,duplicates]=await Promise.all([
     prisma.crmOutreachLead.groupBy({by:['status'],where,_count:true}),
     prisma.crmOutreachLead.findMany({where:{...where,...(status?{status}:{})},orderBy:{createdAt:'desc'},skip:page*50,take:50,include:{comments:{orderBy:{commentedAt:'desc'}},events:{orderBy:{createdAt:'desc'},take:20}}}),
-    prisma.crmOutreachLead.count({where}),prisma.crmOutreachLead.count({where:{...where,firstSentAt:{not:null}}}),prisma.crmOutreachLead.count({where:{...where,lastReplyAt:{not:null}}}),prisma.crmOutreachLead.count({where:{...where,surveySentAt:{not:null}}}),prisma.crmOutreachLead.aggregate({where,_sum:{duplicateCount:true}}),
+    prisma.crmOutreachLead.count({where}),prisma.crmOutreachLead.count({where:{...where,firstSentAt:{not:null}}}),prisma.crmOutreachLead.count({where:{...where,lastReplyAt:{not:null},firstSentAt:{not:null}}}),prisma.crmOutreachLead.count({where:{...where,surveySentAt:{not:null}}}),prisma.crmOutreachLead.aggregate({where,_sum:{duplicateCount:true}}),
   ]);
   return NextResponse.json({accounts,campaign,leads,counts:Object.fromEntries(grouped.map(g=>[g.status,g._count])),total,firstSent,responded,surveySent,duplicates:duplicates._sum.duplicateCount||0,response_rate:firstSent?responded/firstSent:0,survey_send_rate:firstSent?surveySent/firstSent:0,enabled:enabled()},{headers:{'Cache-Control':'no-store'}});
 }

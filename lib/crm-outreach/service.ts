@@ -27,7 +27,8 @@ export async function importComments(workspaceId:string,accountId:string,mediaId
         await tx.crmOutreachComment.upsert({where:{campaignId_commentId:{campaignId:campaign.id,commentId:comment.id}},create:{leadId:lead.id,campaignId:campaign.id,commentId:comment.id,mediaId,commentedAt:new Date(comment.timestamp),text:comment.text},update:{}});
         const all=await tx.crmOutreachComment.findMany({where:{leadId:lead.id},orderBy:{commentedAt:'desc'}});
         const contacted=await tx.dmLog.findFirst({where:{instagramAccountId:account.id,status:'SENT',OR:[{commenterId:lead.commenterId},{commentId:{in:all.map(c=>c.commentId)}}]}});
-        await tx.crmOutreachLead.updateMany({where:{id:lead.id,status:{in:['pending','eligible','ineligible']}},data:{status:contacted?'do_not_contact':eligibleComment(all[0].commentedAt)?'eligible':'ineligible',reason:contacted?'already_contacted':eligibleComment(all[0].commentedAt)?'age_candidate_not_api_confirmed':'older_than_7_days',duplicateCount:Math.max(0,all.length-1)}});
+        await tx.crmOutreachLead.update({where:{id:lead.id},data:{duplicateCount:Math.max(0,all.length-1)}});
+        await tx.crmOutreachLead.updateMany({where:{id:lead.id,status:{in:['pending','eligible','ineligible']}},data:{status:contacted?'do_not_contact':eligibleComment(all[0].commentedAt)?'eligible':'ineligible',reason:contacted?'already_contacted':eligibleComment(all[0].commentedAt)?'age_candidate_not_api_confirmed':'older_than_7_days'}});
       });imported++;
     }
   }
@@ -43,7 +44,7 @@ export async function handleReply(job:ProcessMessageJob):Promise<boolean> {
   if(lead.replyMessageId===job.messageId && lead.reason!=='reply_pending_confirmation')return true;
   const intent=classifyReply(job.messageText);
   if(intent==='not_interested') {
-    await prisma.crmOutreachLead.update({where:{id:lead.id},data:{status:'not_interested',reason:'explicit_opt_out',retrySafe:false,...(lead.firstSentAt && job.inboundTimestamp && openReplyWindow(new Date(job.inboundTimestamp)) ? {lastReplyAt:new Date(job.inboundTimestamp)} : {}),replyMessageId:job.messageId,replyText:job.messageText}});
+    await prisma.crmOutreachLead.update({where:{id:lead.id},data:{status:'not_interested',reason:'explicit_opt_out',retrySafe:false,...(job.inboundTimestamp && openReplyWindow(new Date(job.inboundTimestamp)) ? {lastReplyAt:new Date(job.inboundTimestamp)} : {}),replyMessageId:job.messageId,replyText:job.messageText}});
     await event(lead.id,'opt_out',{messageId:job.messageId});return true;
   }
   if(lead.status==='first_message_queued' && lead.sendingPhase==='first' && job.inboundTimestamp) {
